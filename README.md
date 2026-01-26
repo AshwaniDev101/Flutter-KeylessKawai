@@ -1,16 +1,18 @@
-# keyless_kawai
+# Keyless Kawai 🔐
 
-A simple door unlocker for personal rooms.
+Keyless Kawai is a simple personal Flutter app designed to unlock room doors and notify the user when forced entry is detected.
 
-## Getting Started
+This project focuses on minimal functionality, reliability, and fast access. It is built for private use and experimentation with hardware-based door lock systems.
 
-This project is a starting point for a Flutter application.
+## Features
+- Keyless door unlocking
+- Forced-entry detection alerts
+- Minimal and clean UI
+- Personal-use focused design
 
-A few resources to get you started if this is your first Flutter project:
+## Tech Stack
+- Flutter
+- Dart
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Purpose
+This app is a personal project created to learn and experiment with door lock automation and alert systems. It is not intended for commercial use.
