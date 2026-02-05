@@ -8,6 +8,10 @@ import android.content.Intent
 import android.widget.RemoteViews
 import android.util.Log
 
+//AppWidgetProvider is a broadcast receiver provided by Android
+//It listens to widget lifecycle events sent by the system.
+//This class does not draw UI directly. It controls the widget using RemoteViews.
+
 class KeylessWidgetProvider : AppWidgetProvider() {
 
     companion object {
