@@ -13,7 +13,6 @@ import android.app.PendingIntent
 import android.content.Intent
 // Widgets cannot access real Views → only this “proxy view”.
 import android.widget.RemoteViews
-import io.github.ashwanidev101.keyless_kawai.keyless_kawai.KeylessWidgetProvider.Companion.ACTION_UNLOCK
 
 
 // AppWidgetProvider is a broadcast receiver provided by Android
@@ -27,7 +26,8 @@ import io.github.ashwanidev101.keyless_kawai.keyless_kawai.KeylessWidgetProvider
 class KeylessWidgetProvider : AppWidgetProvider() {
 
     companion object {
-        const val ACTION_UNLOCK = "KEYLESS_ACTION_UNLOCK"
+        const val ACTION_BUTTON_UNLOCK = "KEYLESS_ACTION_UNLOCK"
+        const val ACTION_ICON_UNLOCK = "ACTION_ICON"
     }
 
     // 'onUpdate' Called when:
@@ -43,17 +43,29 @@ class KeylessWidgetProvider : AppWidgetProvider() {
 
         // Intent (what happens on click)
         // This says: Send a broadcast Back to this same widget provider With action = KEYLESS_ACTION_UNLOCK
-        val intent = Intent(context, KeylessWidgetProvider::class.java).apply {
-            action = ACTION_UNLOCK
+
+        val unlockBtnIntent = Intent(context, KeylessWidgetProvider::class.java).apply {
+            action = ACTION_BUTTON_UNLOCK
+        }
+
+        val unlockIconIntent = Intent(context, KeylessWidgetProvider::class.java).apply {
+            action = ACTION_ICON_UNLOCK
         }
 
 
         // PendingIntent?
         // Widgets run outside your app, They need permission to call back into your app
-        val pendingIntent = PendingIntent.getBroadcast(
+        val unlockBtnPendingIntent = PendingIntent.getBroadcast(
             context,
-            0,
-            intent,
+            1,
+            unlockBtnIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val unlockIconPendingIntent = PendingIntent.getBroadcast(
+            context,
+            2,
+            unlockIconIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -63,8 +75,14 @@ class KeylessWidgetProvider : AppWidgetProvider() {
             R.layout.keyless_widget
         )
 
-        // Attach click to button
-        views.setOnClickPendingIntent(R.id.btn_unlock, pendingIntent)
+
+        // Attaching Function to Layout
+        // Button click
+        views.setOnClickPendingIntent(R.id.unlock_btn, unlockBtnPendingIntent)
+
+        // Image click
+        views.setOnClickPendingIntent(R.id.unlock_icon, unlockIconPendingIntent)
+
 
 
         //Update the widget and Pushes the RemoteViews to the launcher.
@@ -80,19 +98,42 @@ class KeylessWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
 
-        if (intent.action == ACTION_UNLOCK) {
-            val serviceIntent = Intent(context, UnlockService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+//        Log.d("===", "onReceive")
 
-                // API 24–25
-                context.startForegroundService(serviceIntent)
-            } else {
 
-                // API 26+
-                context.startService(serviceIntent)
+        when (intent.action) {
+
+            ACTION_BUTTON_UNLOCK -> {
+                Log.d("===", "BUTTON pressed")
+
+                WebSocketManager.sendH();
+
+//                startService(context, "H")
             }
 
+            ACTION_ICON_UNLOCK-> {
+                Log.d("===", "ICON pressed")
+                WebSocketManager.sendL();
+//                startService(context, "L")
+            }
         }
+
+//        if (intent.action == ACTION_UNLOCK) {
+//
+//            Log.d("===", "ACTION_UNLOCK")
+//
+//            val serviceIntent = Intent(context, UnlockService::class.java)
+//            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+//
+//                // API 24–25
+//                context.startForegroundService(serviceIntent)
+//            } else {
+//
+//                // API 26+
+//                context.startService(serviceIntent)
+//            }
+//
+//        }
     }
 
 

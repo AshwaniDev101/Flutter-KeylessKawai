@@ -9,11 +9,10 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import java.net.Socket
 
 
 // This is an Android Service.
-// A Service: Has no UI, Can run when app is closed, Can run when phone is
+// A Service: Has no UI, Can run when app is closed, Can run when phone is locked
 
 // Widget → Service → Local WebSocket / TCP → Door
 class UnlockService : Service() {
@@ -27,9 +26,9 @@ class UnlockService : Service() {
 
         Thread {
             try {
-                sendUnlockSignal()
+                sendUnlockSignal("H")
             } catch (e: Exception) {
-                Log.e("UnlockService", "Unlock failed", e)
+                Log.e("===", "Unlock failed", e)
             } finally {
                 stopSelf()
             }
@@ -38,17 +37,30 @@ class UnlockService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun sendUnlockSignal() {
-        // LOCAL NETWORK ONLY
-        val socket = Socket("192.168.1.50", 8080)
+    private fun sendUnlockSignal(cmd: String) {
 
-        socket.getOutputStream().use {
-            it.write("UNLOCK\n".toByteArray())
-            it.flush()
+//        WebSocketManager.init();
+//
+//        WebSocketManager.sendH();
+        // LOCAL NETWORK ONLY
+//        val socket = Socket("192.168.1.50", 8080)
+//
+//        socket.getOutputStream().use {
+//            it.write("UNLOCK\n".toByteArray())
+//            it.flush()
+//        }
+//
+//        socket.close()
+
+        WebSocketManager.init()
+
+        when (cmd) {
+            "H" -> WebSocketManager.sendH()
+            "L" -> WebSocketManager.sendL()
         }
 
-        socket.close()
-        Log.d("UnlockService", "Unlock signal sent")
+        Log.d("===", "Command sent: $cmd")
+        Log.d("===", "Unlock signal sent")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

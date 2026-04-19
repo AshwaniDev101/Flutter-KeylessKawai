@@ -38,6 +38,10 @@ android {
         }
     }
 }
+dependencies {
+//    implementation("com.google.firebase:firebase-database-ktx:22.0.1")
+    implementation("com.squareup.okhttp3:okhttp:5.3.0")
+}
 
 flutter {
     source = "../.."
