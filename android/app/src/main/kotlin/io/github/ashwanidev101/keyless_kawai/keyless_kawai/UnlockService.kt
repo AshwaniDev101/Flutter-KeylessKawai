@@ -10,67 +10,88 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
-
-// This is an Android Service.
-// A Service: Has no UI, Can run when app is closed, Can run when phone is locked
-
-// Widget → Service → Local WebSocket / TCP → Door
 class UnlockService : Service() {
+
+    companion object {
+        private const val TAG = "==="
+        private const val CHANNEL_ID = "unlock_channel"
+    }
 
     override fun onCreate() {
         super.onCreate()
-        startForeground(1, createNotification())
+        Log.d(TAG, "onCreate called")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                1,
+                createNotification(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(1, createNotification())
+        }
     }
+
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
+        val cmd = intent?.getStringExtra("CMD") ?: "H" // default fallback
+
+        Log.d(TAG, "onStartCommand triggered with CMD: $cmd")
+
         Thread {
             try {
-                sendUnlockSignal("H")
+                Log.d(TAG, "Thread started")
+
+                WebSocketManager.connect {
+                    WebSocketManager.send(cmd) // 🔥 dynamic now
+                }
+
             } catch (e: Exception) {
-                Log.e("===", "Unlock failed", e)
+                Log.e(TAG, "Error occurred", e)
             } finally {
+                Log.d(TAG, "Stopping service")
                 stopSelf()
             }
         }.start()
 
         return START_NOT_STICKY
     }
-
-    private fun sendUnlockSignal(cmd: String) {
-
-//        WebSocketManager.init();
+//    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 //
-//        WebSocketManager.sendH();
-        // LOCAL NETWORK ONLY
-//        val socket = Socket("192.168.1.50", 8080)
+//        Log.d(TAG, "onStartCommand triggered")
 //
-//        socket.getOutputStream().use {
-//            it.write("UNLOCK\n".toByteArray())
-//            it.flush()
-//        }
+//        Thread {
+//            try {
+//                Log.d(TAG, "Thread started")
 //
-//        socket.close()
-
-        WebSocketManager.init()
-
-        when (cmd) {
-            "H" -> WebSocketManager.sendH()
-            "L" -> WebSocketManager.sendL()
-        }
-
-        Log.d("===", "Command sent: $cmd")
-        Log.d("===", "Unlock signal sent")
-    }
+//                // Simulate some work
+//                Thread.sleep(1000)
+//
+//                Log.d(TAG, "TEST: Unlock logic would run here")
+//
+//                WebSocketManager.connect {
+//                    WebSocketManager.send("H")
+//                }
+//
+//            } catch (e: Exception) {
+//                Log.e(TAG, "Error occurred", e)
+//            } finally {
+//                Log.d(TAG, "Stopping service")
+//                stopSelf()
+//            }
+//        }.start()
+//
+//        return START_NOT_STICKY
+//    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotification(): Notification {
-        val channelId = "unlock_channel"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                channelId,
+                CHANNEL_ID,
                 "Unlock Service",
                 NotificationManager.IMPORTANCE_LOW
             )
@@ -79,11 +100,10 @@ class UnlockService : Service() {
             manager.createNotificationChannel(channel)
         }
 
-        return NotificationCompat.Builder(this, channelId)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Keyless")
-            .setContentText("Unlocking door…")
-            .setSmallIcon(R.drawable.ic_notification_lock)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentText("Running test service...")
+            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .build()
     }
 }

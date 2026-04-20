@@ -14,7 +14,7 @@ class MainActivity : FlutterActivity() {
 
 
         Log.d("===", "WebSocketManager init()",);
-        WebSocketManager.init()
+//        WebSocketManager.init()
     }
 }
 

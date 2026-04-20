@@ -5,7 +5,7 @@ import okhttp3.*
 
 object WebSocketManager {
 
-    private const val TAG = "==="
+    private const val TAG = "WebSocket"
     private const val ESP_URL = "ws://192.168.1.200:81"
 
     private val client = OkHttpClient()
@@ -14,66 +14,56 @@ object WebSocketManager {
     var isConnected = false
         private set
 
-    fun init() {
-        Log.d(TAG, "init called. Connecting to $ESP_URL")
+    fun connect(onConnected: (() -> Unit)? = null) {
+        Log.d(TAG, "Connecting to $ESP_URL")
 
         val request = Request.Builder()
             .url(ESP_URL)
             .build()
 
-
-
         val listener = object : WebSocketListener() {
 
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                this@WebSocketManager.webSocket = webSocket
+            override fun onOpen(ws: WebSocket, response: Response) {
+                webSocket = ws
                 isConnected = true
+
                 Log.d(TAG, "Connected")
+
+                onConnected?.invoke() // 🔥 IMPORTANT
             }
 
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                Log.d(TAG, "Message received: $text")
+            override fun onMessage(ws: WebSocket, text: String) {
+                Log.d(TAG, "Message: $text")
             }
 
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "Closing connection: $code $reason")
+            override fun onClosing(ws: WebSocket, code: Int, reason: String) {
+                Log.d(TAG, "Closing: $code $reason")
 
-                this@WebSocketManager.webSocket = null
                 isConnected = false
+                webSocket = null
 
-                webSocket.close(1000, null)
+                ws.close(1000, null)
             }
 
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
                 isConnected = false
-                this@WebSocketManager.webSocket = null
+                webSocket = null
 
-                Log.e(TAG, "Connection failed", t)
-                Log.e(TAG, "Response: ${response?.message}")
+                Log.e(TAG, "Error", t)
             }
         }
 
         client.newWebSocket(request, listener)
     }
 
-    fun sendH() {
+    fun send(command: String) {
         if (!isConnected) {
-            Log.e(TAG, "sendH failed: not connected")
+            Log.e(TAG, "Not connected. Cannot send: $command")
             return
         }
 
-        Log.d(TAG, "Sending H")
-        webSocket?.send("H")
-    }
-
-    fun sendL() {
-        if (!isConnected) {
-            Log.e(TAG, "sendL failed: not connected")
-            return
-        }
-
-        Log.d(TAG, "Sending L")
-        webSocket?.send("L")
+        Log.d(TAG, "Sending: $command")
+        webSocket?.send(command)
     }
 
     fun close() {
