@@ -43,9 +43,7 @@ class UnlockService : Service() {
             try {
                 Log.d(TAG, "Thread started")
 
-                WebSocketManager.connect {
-                    WebSocketManager.send(cmd) // 🔥 dynamic now
-                }
+                WebSocketManager.sendOnce(cmd);
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error occurred", e)
