@@ -16,6 +16,10 @@ class KeylessWidgetProvider : AppWidgetProvider() {
 
         const val ACTION_BUTTON_UNLOCK = "KEYLESS_ACTION_UNLOCK"
         const val ACTION_ICON_UNLOCK = "ACTION_ICON"
+
+        // Persistent key for storing toggle state safely inside disk cache
+        private const val PREFS_NAME = "keyless_widget_prefs"
+        private const val KEY_LED_STATE = "led_toggle_state"
     }
 
     override fun onUpdate(
@@ -23,7 +27,6 @@ class KeylessWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-
         val unlockBtnIntent = Intent(context, KeylessWidgetProvider::class.java).apply {
             action = ACTION_BUTTON_UNLOCK
         }
@@ -62,35 +65,39 @@ class KeylessWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
 
-        Log.d(TAG, "onReceive triggered")
+        Log.d(TAG, "onReceive triggered with action: ${intent.action}")
 
-        val pendingResult = goAsync()
-
-        Thread {
-            try {
-                when (intent.action) {
-
-                    ACTION_BUTTON_UNLOCK -> {
-                        Log.d(TAG, "BUTTON pressed")
-//                        startUnlockService(context)
-                        startUnlockService(context, "H")
-                    }
-
-                    ACTION_ICON_UNLOCK -> {
-                        Log.d(TAG, "ICON pressed")
-//                        startUnlockService(context)
-                        startUnlockService(context, "L")
-                    }
-                }
-            } finally {
-                pendingResult.finish()
+        // Directly parse intents on the main thread loop.
+        // Launching services is incredibly lightweight and doesn't require a background thread.
+        when (intent.action) {
+            ACTION_BUTTON_UNLOCK -> {
+                Log.d(TAG, "Widget Button Pressed -> Triggering Lock")
+                startUnlockService(context, "LOCK_TRIGGER")
             }
-        }.start()
+
+            ACTION_ICON_UNLOCK -> {
+                Log.d(TAG, "Widget Icon Pressed -> Calculating Toggle State")
+
+                // Read persistent value directly from the app storage space
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val currentLedState = prefs.getBoolean(KEY_LED_STATE, false) // default false
+
+                // Determine target command payload string
+                val command = if (currentLedState) "LED_OFF" else "LED_ON"
+                Log.d(TAG, "Calculated toggle operation: sending -> $command")
+
+                // Dispatch task to our stable foreground service container
+                startUnlockService(context, command)
+
+                // Save updated inverted configuration value back to preference disk space
+                prefs.edit().putBoolean(KEY_LED_STATE, !currentLedState).apply()
+            }
+        }
     }
 
     private fun startUnlockService(context: Context, command: String) {
         val serviceIntent = Intent(context, UnlockService::class.java).apply {
-            putExtra("CMD", command) //
+            putExtra("CMD", command)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -99,14 +106,4 @@ class KeylessWidgetProvider : AppWidgetProvider() {
             context.startService(serviceIntent)
         }
     }
-
-//    private fun startUnlockService(context: Context) {
-//        val serviceIntent = Intent(context, UnlockService::class.java)
-//
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//            context.startForegroundService(serviceIntent)
-//        } else {
-//            context.startService(serviceIntent)
-//        }
-//    }
 }

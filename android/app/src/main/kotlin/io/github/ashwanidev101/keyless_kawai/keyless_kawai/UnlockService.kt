@@ -13,7 +13,7 @@ import androidx.core.app.NotificationCompat
 class UnlockService : Service() {
 
     companion object {
-        private const val TAG = "==="
+        private const val TAG = "UnlockService"
         private const val CHANNEL_ID = "unlock_channel"
     }
 
@@ -32,76 +32,42 @@ class UnlockService : Service() {
         }
     }
 
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
-        val cmd = intent?.getStringExtra("CMD") ?: "H" // default fallback
+        // Read string, check if null, AND check if empty to safely fallback to LOCK_TRIGGER
+        val rawCmd = intent?.getStringExtra("CMD")
+        val cmd = if (rawCmd.isNullOrEmpty()) "LOCK_TRIGGER" else rawCmd
 
-        Log.d(TAG, "onStartCommand triggered with CMD: $cmd")
+        Log.d(TAG, "onStartCommand triggered with verified CMD: $cmd")
 
-        Thread {
-            try {
-                Log.d(TAG, "Thread started")
-
-                WebSocketManager.sendOnce(cmd);
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Error occurred", e)
-            } finally {
-                Log.d(TAG, "Stopping service")
-                stopSelf()
-            }
-        }.start()
+        WebSocketManager.sendOnce(cmd) {
+            Log.d(TAG, "Transaction complete. Safely killing background service context.")
+            stopSelf()
+        }
 
         return START_NOT_STICKY
     }
-//    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-//
-//        Log.d(TAG, "onStartCommand triggered")
-//
-//        Thread {
-//            try {
-//                Log.d(TAG, "Thread started")
-//
-//                // Simulate some work
-//                Thread.sleep(1000)
-//
-//                Log.d(TAG, "TEST: Unlock logic would run here")
-//
-//                WebSocketManager.connect {
-//                    WebSocketManager.send("H")
-//                }
-//
-//            } catch (e: Exception) {
-//                Log.e(TAG, "Error occurred", e)
-//            } finally {
-//                Log.d(TAG, "Stopping service")
-//                stopSelf()
-//            }
-//        }.start()
-//
-//        return START_NOT_STICKY
-//    }
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createNotification(): Notification {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Unlock Service",
                 NotificationManager.IMPORTANCE_LOW
-            )
+            ).apply {
+                description = "Handles background IoT device actions"
+            }
 
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Keyless")
-            .setContentText("Running test service...")
+            .setContentTitle("Keyless Kawaii")
+            .setContentText("Executing background request...")
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 }

@@ -7,39 +7,46 @@ class WebSocketManager {
   // Target ESP8266 Endpoint
   static const String _espUrl = "ws://192.168.1.200:81";
 
-  static Future<void> sendOnce(String command) async {
+  static Future<void> sendOnce(String command, {Function(String)? onResponse}) async {
     if (kDebugMode) print("WebSocketManager: Connecting to deliver '$command'...");
 
     try {
       final uri = Uri.parse(_espUrl);
       final channel = WebSocketChannel.connect(uri);
-
-      // We explicitly pull a reference to the sink to keep control over it
       final WebSocketSink sink = channel.sink;
+
+      bool receivedMessage = false;
 
       channel.stream.listen(
             (message) {
           if (kDebugMode) print("WebSocketManager Received Confirmation: $message");
+          receivedMessage = true;
 
-          // Exactly like Kotlin's onMessage block:
-          // The ESP8266 replied, so it definitely processed our payload. Safe to close now!
+          // Forward the raw text string back to our UI callback handler
+          if (onResponse != null) {
+            onResponse(message.toString());
+          }
+
           if (kDebugMode) print("Transaction confirmed by ESP. Closing socket safely.");
           sink.close(status.normalClosure);
         },
         onError: (error) {
           if (kDebugMode) print("WebSocketManager Network Error: $error");
+          if (onResponse != null) onResponse("ERROR");
         },
         onDone: () {
           if (kDebugMode) print("WebSocketManager Status: Connection cycle finished.");
+          // Fallback if socket closes without a clear payload string response
+          if (!receivedMessage && onResponse != null) onResponse("DONE");
         },
         cancelOnError: true,
       );
 
-      // Transmit the raw data string down the active sink
       sink.add(command);
 
     } catch (e) {
       if (kDebugMode) print("WebSocketManager Exception caught: $e");
+      if (onResponse != null) onResponse("ERROR");
     }
   }
 }
