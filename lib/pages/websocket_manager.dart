@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
@@ -7,46 +6,26 @@ class WebSocketManager {
   // Target ESP8266 Endpoint
   static const String _espUrl = "ws://192.168.1.200:81";
 
-  static Future<void> sendOnce(String command, {Function(String)? onResponse}) async {
-    if (kDebugMode) print("WebSocketManager: Connecting to deliver '$command'...");
+  static Future<void> sendOnce(String command) async {
+    if (kDebugMode) print("WebSocketManager: Fast-firing '$command'...");
 
     try {
       final uri = Uri.parse(_espUrl);
       final channel = WebSocketChannel.connect(uri);
       final WebSocketSink sink = channel.sink;
 
-      bool receivedMessage = false;
-
-      channel.stream.listen(
-            (message) {
-          if (kDebugMode) print("WebSocketManager Received Confirmation: $message");
-          receivedMessage = true;
-
-          // Forward the raw text string back to our UI callback handler
-          if (onResponse != null) {
-            onResponse(message.toString());
-          }
-
-          if (kDebugMode) print("Transaction confirmed by ESP. Closing socket safely.");
-          sink.close(status.normalClosure);
-        },
-        onError: (error) {
-          if (kDebugMode) print("WebSocketManager Network Error: $error");
-          if (onResponse != null) onResponse("ERROR");
-        },
-        onDone: () {
-          if (kDebugMode) print("WebSocketManager Status: Connection cycle finished.");
-          // Fallback if socket closes without a clear payload string response
-          if (!receivedMessage && onResponse != null) onResponse("DONE");
-        },
-        cancelOnError: true,
-      );
-
+      // 1. Shove payload command string down the active network pipe
       sink.add(command);
 
+      // 2. Give the phone's OS TCP stack a 200ms window to completely flush
+      // the packets out of the device before cutting the stream context
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      if (kDebugMode) print("Buffer flushed. Closing fire-and-forget socket safely.");
+      sink.close(status.normalClosure);
+
     } catch (e) {
-      if (kDebugMode) print("WebSocketManager Exception caught: $e");
-      if (onResponse != null) onResponse("ERROR");
+      if (kDebugMode) print("WebSocketManager Fire Exception caught: $e");
     }
   }
 }
