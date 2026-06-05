@@ -13,6 +13,7 @@ class _HomepageState extends State<Homepage> {
   bool _ledOn = false;
   bool _indoorOn = false;
   bool _outdoorOn = false;
+  bool _buzzerOn = false; // Added local state tracker for the D7 Buzzer
 
   // Optimistic execution interceptor to fire actions and change state simultaneously
   void _executeSecureCommand(String command) {
@@ -28,6 +29,8 @@ class _HomepageState extends State<Homepage> {
       if (command == "INDOOR_LIGHT_OFF") _indoorOn = false;
       if (command == "OUTDOOR_LIGHT_ON") _outdoorOn = true;
       if (command == "OUTDOOR_LIGHT_OFF") _outdoorOn = false;
+      if (command == "BUZZER_ON") _buzzerOn = true;   // Intercept manual buzzer turn on
+      if (command == "BUZZER_OFF") _buzzerOn = false; // Intercept manual buzzer turn off
     });
   }
 
@@ -79,7 +82,7 @@ class _HomepageState extends State<Homepage> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 36.0, horizontal: 16.0),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment:  MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             CircleAvatar(
@@ -157,6 +160,15 @@ class _HomepageState extends State<Homepage> {
                     offCmd: "OUTDOOR_LIGHT_OFF",
                     surfaceColor: surfaceColor,
                   ),
+                  _buildMinimalGridTile( // --- NEW FIXED BUZZER SWITCH TILE ---
+                    title: "System Buzzer",
+                    subtitle: "Alarm Output D7",
+                    icon: Icons.volume_up_rounded,
+                    isActive: _buzzerOn,
+                    onCmd: "BUZZER_ON",
+                    offCmd: "BUZZER_OFF",
+                    surfaceColor: surfaceColor,
+                  ),
                 ],
               ),
             ],
@@ -189,9 +201,8 @@ class _HomepageState extends State<Homepage> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            // Entire card captures the tap gesture now
             onTap: () => _executeSecureCommand(isActive ? offCmd : onCmd),
-            splashColor: Colors.amber.withOpacity(0.05),
+            splashColor: Colors.amber.withValues(alpha: 0.05),
             highlightColor: Colors.transparent,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -206,7 +217,6 @@ class _HomepageState extends State<Homepage> {
                           color: isActive ? Colors.amber.shade600 : Colors.blueGrey.shade600,
                           size: 24
                       ),
-                      // IgnorePointer blocks direct switch taps, making it react passively to the card
                       IgnorePointer(
                         child: Container(
                           height: 32,
@@ -269,7 +279,6 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  // Simplified: Removed network firing dependencies since parent InkWell handles it
   Widget _buildMicroActionButton({
     required String label,
     required bool isSelected,
