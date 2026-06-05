@@ -9,19 +9,16 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
-  // Local UI States Tracking (false = OFF, true = ON)
+  // UI state tracking
   bool _ledOn = false;
   bool _indoorOn = false;
   bool _outdoorOn = false;
-  bool _buzzerOn = false; // Added local state tracker for the D7 Buzzer
+  bool _buzzerOn = false;
 
-  // Optimistic execution interceptor to fire actions and change state simultaneously
+  // Optimistic UI state updates & WS execution
   void _executeSecureCommand(String command) {
-
-    // Fire network payload completely asynchronously (Fire-and-forget)
     WebSocketManager.sendOnce(command);
 
-    // Instantly mutate state on the UI layer for zero-latency response animations
     setState(() {
       if (command == "LED_ON") _ledOn = true;
       if (command == "LED_OFF") _ledOn = false;
@@ -29,8 +26,8 @@ class _HomepageState extends State<Homepage> {
       if (command == "INDOOR_LIGHT_OFF") _indoorOn = false;
       if (command == "OUTDOOR_LIGHT_ON") _outdoorOn = true;
       if (command == "OUTDOOR_LIGHT_OFF") _outdoorOn = false;
-      if (command == "BUZZER_ON") _buzzerOn = true;   // Intercept manual buzzer turn on
-      if (command == "BUZZER_OFF") _buzzerOn = false; // Intercept manual buzzer turn off
+      if (command == "BUZZER_ON") _buzzerOn = true;
+      if (command == "BUZZER_OFF") _buzzerOn = false;
     });
   }
 
@@ -64,7 +61,7 @@ class _HomepageState extends State<Homepage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- HERO BANNER: UNLOCK ACTION ---
+              // Hero Banner: Main Lock
               Container(
                 decoration: BoxDecoration(
                   color: surfaceColor,
@@ -77,7 +74,7 @@ class _HomepageState extends State<Homepage> {
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: () => _executeSecureCommand("LOCK_TRIGGER"),
-                      splashColor: primaryAccent.withOpacity(0.1),
+                      splashColor: primaryAccent.withValues(alpha: 0.1),
                       highlightColor: Colors.transparent,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 36.0, horizontal: 16.0),
@@ -87,7 +84,7 @@ class _HomepageState extends State<Homepage> {
                           children: [
                             CircleAvatar(
                               radius: 36,
-                              backgroundColor: primaryAccent.withOpacity(0.08),
+                              backgroundColor: primaryAccent.withValues(alpha: 0.08),
                               child: Icon(Icons.lock_open_rounded, size: 36, color: primaryAccent),
                             ),
                             const SizedBox(height: 16),
@@ -124,20 +121,19 @@ class _HomepageState extends State<Homepage> {
               ),
               const SizedBox(height: 16),
 
-              // --- TWO COLUMN SWITCH GRID ---
+              // Device Control Grid
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 1.15,
+                childAspectRatio: 1.1, // Aspect ratio optimized for a compact layout
                 children: [
                   _buildMinimalGridTile(
                     title: "Built-in LED",
                     subtitle: "NodeMCU D4",
                     icon: Icons.developer_board_rounded,
-                    isActive: _ledOn,
                     onCmd: "LED_ON",
                     offCmd: "LED_OFF",
                     surfaceColor: surfaceColor,
@@ -146,7 +142,6 @@ class _HomepageState extends State<Homepage> {
                     title: "Indoor Light",
                     subtitle: "Living Room D1",
                     icon: Icons.light_rounded,
-                    isActive: _indoorOn,
                     onCmd: "INDOOR_LIGHT_ON",
                     offCmd: "INDOOR_LIGHT_OFF",
                     surfaceColor: surfaceColor,
@@ -155,16 +150,14 @@ class _HomepageState extends State<Homepage> {
                     title: "Outdoor Light",
                     subtitle: "Backyard D2",
                     icon: Icons.wb_sunny_rounded,
-                    isActive: _outdoorOn,
                     onCmd: "OUTDOOR_LIGHT_ON",
                     offCmd: "OUTDOOR_LIGHT_OFF",
                     surfaceColor: surfaceColor,
                   ),
-                  _buildMinimalGridTile( // --- NEW FIXED BUZZER SWITCH TILE ---
+                  _buildMinimalGridTile(
                     title: "System Buzzer",
                     subtitle: "Alarm Output D7",
                     icon: Icons.volume_up_rounded,
-                    isActive: _buzzerOn,
                     onCmd: "BUZZER_ON",
                     offCmd: "BUZZER_OFF",
                     surfaceColor: surfaceColor,
@@ -182,7 +175,6 @@ class _HomepageState extends State<Homepage> {
     required String title,
     required String subtitle,
     required IconData icon,
-    required bool isActive,
     required String onCmd,
     required String offCmd,
     required Color surfaceColor,
@@ -191,116 +183,96 @@ class _HomepageState extends State<Homepage> {
       decoration: BoxDecoration(
         color: surfaceColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-            color: isActive ? Colors.amber.shade200 : Colors.grey.shade200,
-            width: isActive ? 1.5 : 1
-        ),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _executeSecureCommand(isActive ? offCmd : onCmd),
-            splashColor: Colors.amber.withValues(alpha: 0.05),
-            highlightColor: Colors.transparent,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Icon(
-                          icon,
-                          color: isActive ? Colors.amber.shade600 : Colors.blueGrey.shade600,
-                          size: 24
-                      ),
-                      IgnorePointer(
-                        child: Container(
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              _buildMicroActionButton(
-                                  label: "OFF",
-                                  isSelected: !isActive,
-                                  activeColor: Colors.black54
-                              ),
-                              Container(width: 1, height: 16, color: Colors.grey.shade300),
-                              _buildMicroActionButton(
-                                  label: "ON",
-                                  isSelected: isActive,
-                                  activeColor: Colors.amber.shade600
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    ],
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Forces column to stay compact
+          children: [
+            // Icon and Header Layout
+            Row(
+              children: [
+                Icon(
+                  icon,
+                  color: Colors.blueGrey.shade600,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black87),
                   ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isActive ? Colors.amber.shade500 : Colors.grey.shade300,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black87),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
-                  ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+
+            // Nested Subtitle
+            Padding(
+              padding: const EdgeInsets.only(left: 28.0),
+              child: Text(
+                subtitle,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
               ),
             ),
-          ),
+
+            const SizedBox(height: 14), // Controlled fixed gap between info and controls
+
+            // Identical Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    label: "OFF",
+                    onTap: () => _executeSecureCommand(offCmd),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildActionButton(
+                    label: "ON",
+                    onTap: () => _executeSecureCommand(onCmd),
+                  ),
+                ),
+              ],
+            )
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildMicroActionButton({
+  Widget _buildActionButton({
     required String label,
-    required bool isSelected,
-    required Color activeColor
+    required VoidCallback onTap,
   }) {
     return Container(
+      height: 40,
       decoration: BoxDecoration(
-        color: isSelected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: isSelected
-            ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 1))]
-            : [],
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Center(
-        child: Text(
-          label,
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: isSelected ? activeColor : Colors.grey.shade400,
-              letterSpacing: 0.5
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Center(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+                letterSpacing: 0.5,
+              ),
+            ),
           ),
         ),
       ),
