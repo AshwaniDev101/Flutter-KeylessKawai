@@ -3,10 +3,10 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
 class WebSocketManager {
-  // Target ESP8266 Endpoint
   static const String _espUrl = "ws://192.168.1.200:81";
 
-  static Future<void> sendOnce(String command) async {
+  // Fires command string and returns the mirrored data payload response
+  static Future<String?> sendOnce(String command) async {
     if (kDebugMode) print("WebSocketManager: Fast-firing '$command'...");
 
     try {
@@ -14,18 +14,22 @@ class WebSocketManager {
       final channel = WebSocketChannel.connect(uri);
       final WebSocketSink sink = channel.sink;
 
-      // 1. Shove payload command string down the active network pipe
       sink.add(command);
 
-      // 2. Give the phone's OS TCP stack a 200ms window to completely flush
-      // the packets out of the device before cutting the stream context
-      await Future.delayed(const Duration(milliseconds: 200));
+      // Wait for the incoming mirror response message packet from the socket stream
+      final String response = await channel.stream.first.timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () => "",
+      );
 
-      if (kDebugMode) print("Buffer flushed. Closing fire-and-forget socket safely.");
+      // Graceful socket teardown allocation post transmission flush window
+      await Future.delayed(const Duration(milliseconds: 50));
       sink.close(status.normalClosure);
 
+      return response.isNotEmpty ? response : null;
     } catch (e) {
       if (kDebugMode) print("WebSocketManager Fire Exception caught: $e");
+      return null;
     }
   }
 }

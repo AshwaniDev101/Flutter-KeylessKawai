@@ -34,10 +34,9 @@ class _HomepageState extends State<Homepage> {
   final TextEditingController _consoleController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // Optimistic UI state updates, WS execution & terminal logging
-  void _executeSecureCommand(String command) {
-    WebSocketManager.sendOnce(command);
-
+  // Async UI local lifecycle updates, WS pipeline management & RX capture handling
+  void _executeSecureCommand(String command) async {
+    // 1. Initial Local State Mutation & TX Logging
     setState(() {
       _consoleController.text += "[TX] -> $command\n";
 
@@ -51,7 +50,21 @@ class _HomepageState extends State<Homepage> {
       if (command == AppStrings.cmdBuzzerOff) _buzzerOn = false;
     });
 
-    // Handle automated scroll execution if flag is active
+    _triggerScrollToBottom();
+
+    // 2. Await network socket resolution for mirror check payload extraction
+    final String? rxData = await WebSocketManager.sendOnce(command);
+
+    if (rxData != null && mounted) {
+      setState(() {
+        _consoleController.text += "[RX] <- $rxData\n";
+      });
+      _triggerScrollToBottom();
+    }
+  }
+
+  // Handle automated terminal scroll view alignment jumps
+  void _triggerScrollToBottom() {
     if (_snapToLatest) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
@@ -108,7 +121,7 @@ class _HomepageState extends State<Homepage> {
                   TextField(
                     controller: _consoleController,
                     scrollController: _scrollController,
-                    maxLines: 14, // Increased maxLines for a taller console window
+                    maxLines: 14,
                     readOnly: true,
                     style: const TextStyle(
                       fontFamily: 'monospace',
@@ -155,7 +168,7 @@ class _HomepageState extends State<Homepage> {
               ),
               const SizedBox(height: 16),
 
-              // Normalized and downsized central interactive asset
+              // Centralized and downsized interactive trigger asset
               Center(
                 child: SizedBox(
                   width: 160,
