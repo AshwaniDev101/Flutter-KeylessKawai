@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'websocket_manager.dart';
 
 class AppStrings {
-  // Commands
   static const String cmdLockTrigger = 'LOCK_TRIGGER';
   static const String cmdLedOn = 'LED_ON';
   static const String cmdLedOff = 'LED_OFF';
@@ -14,6 +13,13 @@ class AppStrings {
   static const String cmdBuzzerOff = 'BUZZER_OFF';
 }
 
+class LogEntry {
+  final String text;
+  final bool isTx;
+
+  LogEntry({required this.text, required this.isTx});
+}
+
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
 
@@ -22,23 +28,18 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
-  // UI state tracking
   bool _ledOn = false;
   bool _indoorOn = false;
   bool _outdoorOn = false;
   bool _buzzerOn = false;
-
-  // Snap/Autoscroll flag for terminal tracking
   bool _snapToLatest = true;
 
-  final TextEditingController _consoleController = TextEditingController();
+  final List<LogEntry> _logs = [];
   final ScrollController _scrollController = ScrollController();
 
-  // Async UI local lifecycle updates, WS pipeline management & RX capture handling
   void _executeSecureCommand(String command) async {
-    // 1. Initial Local State Mutation & TX Logging
     setState(() {
-      _consoleController.text += "[TX] -> $command\n";
+      _logs.add(LogEntry(text: "$command <- [TX]", isTx: true));
 
       if (command == AppStrings.cmdLedOn) _ledOn = true;
       if (command == AppStrings.cmdLedOff) _ledOn = false;
@@ -52,18 +53,44 @@ class _HomepageState extends State<Homepage> {
 
     _triggerScrollToBottom();
 
-    // 2. Await network socket resolution for mirror check payload extraction
     final String? rxData = await WebSocketManager.sendOnce(command);
 
     if (rxData != null && mounted) {
       setState(() {
-        _consoleController.text += "[RX] <- $rxData\n";
+        _logs.add(LogEntry(text: "[RX] <- $rxData", isTx: false));
       });
       _triggerScrollToBottom();
     }
   }
 
-  // Handle automated terminal scroll view alignment jumps
+  void _executeAllOff() async {
+    final commands = [
+      AppStrings.cmdLedOff,
+      AppStrings.cmdIndoorOff,
+      AppStrings.cmdOutdoorOff,
+      AppStrings.cmdBuzzerOff,
+    ];
+
+    setState(() {
+      _logs.add(LogEntry(text: "ALL_DEVICES_OFF <- [TX]", isTx: true));
+      _ledOn = false;
+      _indoorOn = false;
+      _outdoorOn = false;
+      _buzzerOn = false;
+    });
+    _triggerScrollToBottom();
+
+    for (var cmd in commands) {
+      final String? rxData = await WebSocketManager.sendOnce(cmd);
+      if (rxData != null && mounted) {
+        setState(() {
+          _logs.add(LogEntry(text: "[RX] <- $rxData", isTx: false));
+        });
+        _triggerScrollToBottom();
+      }
+    }
+  }
+
   void _triggerScrollToBottom() {
     if (_snapToLatest) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -80,7 +107,6 @@ class _HomepageState extends State<Homepage> {
 
   @override
   void dispose() {
-    _consoleController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -89,19 +115,13 @@ class _HomepageState extends State<Homepage> {
   Widget build(BuildContext context) {
     final backgroundColor = Colors.grey.shade50;
     final surfaceColor = Colors.white;
-    final primaryAccent = Colors.deepOrange.shade600;
 
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
         title: const Text(
           'KEYLESS KAWAII',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 2.0,
-            color: Colors.black87,
-          ),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 2.0, color: Colors.black87),
         ),
         centerTitle: true,
         backgroundColor: backgroundColor,
@@ -115,86 +135,11 @@ class _HomepageState extends State<Homepage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Terminal window container stack with nested snap controller
-              Stack(
-                children: [
-                  TextField(
-                    controller: _consoleController,
-                    scrollController: _scrollController,
-                    maxLines: 14,
-                    readOnly: true,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 8,
-                      color: Colors.lightGreenAccent,
-                    ),
-                    decoration: InputDecoration(
-                      fillColor: Colors.black87,
-                      filled: true,
-                      hintText: "Terminal ready...",
-                      hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'monospace', fontSize: 12),
-                      contentPadding: const EdgeInsets.all(16),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 8,
-                    bottom: 8,
-                    child: SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: FloatingActionButton(
-                        onPressed: () {
-                          setState(() {
-                            _snapToLatest = !_snapToLatest;
-                          });
-                        },
-                        elevation: 2,
-                        backgroundColor: _snapToLatest ? Colors.lightGreenAccent : Colors.grey.shade800,
-                        mini: true,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        child: Icon(
-                          Icons.vertical_align_bottom_rounded,
-                          size: 16,
-                          color: _snapToLatest ? Colors.black87 : Colors.white70,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Centralized and downsized interactive trigger asset
-              Center(
-                child: SizedBox(
-                  width: 160,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _executeSecureCommand(AppStrings.cmdLockTrigger),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: surfaceColor,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey.shade200, width: 1),
-                      ),
-                    ),
-                    icon: Icon(Icons.lock_open_rounded, color: primaryAccent, size: 20),
-                    label: const Text(
-                      "Unlock",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black87,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
+              TerminalWindow(
+                logs: _logs,
+                scrollController: _scrollController,
+                snapToLatest: _snapToLatest,
+                onSnapToggle: (val) => setState(() => _snapToLatest = val),
               ),
               const SizedBox(height: 36),
 
@@ -202,16 +147,11 @@ class _HomepageState extends State<Homepage> {
                 padding: EdgeInsets.only(left: 4.0),
                 child: Text(
                   "DEVICE DASHBOARD",
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                      color: Colors.black45),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: Colors.black45),
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Device Control Grid
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -220,37 +160,60 @@ class _HomepageState extends State<Homepage> {
                 mainAxisSpacing: 16,
                 childAspectRatio: 1.1,
                 children: [
-                  _buildMinimalGridTile(
+                  // Master Global Actions (Positioned on top)
+                  SystemActionGridTile(
+                    title: "Door Unlock",
+                    subtitle: "Unlocks main door",
+                    icon: Icons.lock_open_rounded,
+                    btnLabel: "UNLOCK",
+                    surfaceColor: surfaceColor,
+                    onTap: () => _executeSecureCommand(AppStrings.cmdLockTrigger),
+                  ),
+                  SystemActionGridTile(
+                    title: "All OFF",
+                    subtitle: "Kill all channels",
+                    icon: Icons.power_settings_new_rounded,
+                    btnLabel: "OFF",
+                    surfaceColor: surfaceColor,
+                    onTap: _executeAllOff,
+                  ),
+
+                  // Standard Device Channels
+                  DeviceGridTile(
                     title: "Built-in LED",
                     subtitle: "NodeMCU D4",
                     icon: Icons.developer_board_rounded,
                     onCmd: AppStrings.cmdLedOn,
                     offCmd: AppStrings.cmdLedOff,
                     surfaceColor: surfaceColor,
+                    onCommandExecuted: _executeSecureCommand,
                   ),
-                  _buildMinimalGridTile(
+                  DeviceGridTile(
                     title: "Indoor Light",
                     subtitle: "Living Room D1",
                     icon: Icons.light_rounded,
                     onCmd: AppStrings.cmdIndoorOn,
                     offCmd: AppStrings.cmdIndoorOff,
                     surfaceColor: surfaceColor,
+                    onCommandExecuted: _executeSecureCommand,
                   ),
-                  _buildMinimalGridTile(
+                  DeviceGridTile(
                     title: "Outdoor Light",
                     subtitle: "Backyard D2",
                     icon: Icons.wb_sunny_rounded,
                     onCmd: AppStrings.cmdOutdoorOn,
                     offCmd: AppStrings.cmdOutdoorOff,
                     surfaceColor: surfaceColor,
+                    onCommandExecuted: _executeSecureCommand,
                   ),
-                  _buildMinimalGridTile(
+                  DeviceGridTile(
                     title: "System Buzzer",
                     subtitle: "Alarm Output D7",
                     icon: Icons.volume_up_rounded,
                     onCmd: AppStrings.cmdBuzzerOn,
                     offCmd: AppStrings.cmdBuzzerOff,
                     surfaceColor: surfaceColor,
+                    onCommandExecuted: _executeSecureCommand,
                   ),
                 ],
               ),
@@ -260,15 +223,105 @@ class _HomepageState extends State<Homepage> {
       ),
     );
   }
+}
 
-  Widget _buildMinimalGridTile({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required String onCmd,
-    required String offCmd,
-    required Color surfaceColor,
-  }) {
+class TerminalWindow extends StatelessWidget {
+  final List<LogEntry> logs;
+  final ScrollController scrollController;
+  final bool snapToLatest;
+  final ValueChanged<bool> onSnapToggle;
+
+  const TerminalWindow({
+    super.key,
+    required this.logs,
+    required this.scrollController,
+    required this.snapToLatest,
+    required this.onSnapToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Container(
+          height: 220,
+          width: double.infinity,
+          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.all(16),
+          child: logs.isEmpty
+              ? const Text(
+            "Terminal ready...",
+            style: TextStyle(color: Colors.grey, fontFamily: 'monospace', fontSize: 12),
+          )
+              : ListView.builder(
+            controller: scrollController,
+            itemCount: logs.length,
+            itemBuilder: (context, index) {
+              final log = logs[index];
+              return Align(
+                alignment: log.isTx ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2.0),
+                  child: Text(
+                    log.text,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 8,
+                      color: log.isTx ? Colors.lightBlueAccent : Colors.lightGreenAccent,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Positioned(
+          right: 8,
+          bottom: 8,
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: FloatingActionButton(
+              onPressed: () => onSnapToggle(!snapToLatest),
+              elevation: 2,
+              backgroundColor: snapToLatest ? Colors.lightGreenAccent : Colors.grey.shade800,
+              mini: true,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              child: Icon(
+                Icons.vertical_align_bottom_rounded,
+                size: 16,
+                color: snapToLatest ? Colors.black87 : Colors.white70,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class DeviceGridTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String onCmd;
+  final String offCmd;
+  final Color surfaceColor;
+  final Function(String) onCommandExecuted;
+
+  const DeviceGridTile({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onCmd,
+    required this.offCmd,
+    required this.surfaceColor,
+    required this.onCommandExecuted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor,
@@ -283,11 +336,7 @@ class _HomepageState extends State<Homepage> {
           children: [
             Row(
               children: [
-                Icon(
-                  icon,
-                  color: Colors.blueGrey.shade600,
-                  size: 20,
-                ),
+                Icon(icon, color: Colors.blueGrey.shade600, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -300,7 +349,6 @@ class _HomepageState extends State<Homepage> {
               ],
             ),
             const SizedBox(height: 2),
-
             Padding(
               padding: const EdgeInsets.only(left: 28.0),
               child: Text(
@@ -308,22 +356,20 @@ class _HomepageState extends State<Homepage> {
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
               ),
             ),
-
-            const SizedBox(height: 14),
-
+            const Spacer(),
             Row(
               children: [
                 Expanded(
-                  child: _buildActionButton(
+                  child: _buildTileButton(
                     label: "OFF",
-                    onTap: () => _executeSecureCommand(offCmd),
+                    onTap: () => onCommandExecuted(offCmd),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: _buildActionButton(
+                  child: _buildTileButton(
                     label: "ON",
-                    onTap: () => _executeSecureCommand(onCmd),
+                    onTap: () => onCommandExecuted(onCmd),
                   ),
                 ),
               ],
@@ -334,10 +380,7 @@ class _HomepageState extends State<Homepage> {
     );
   }
 
-  Widget _buildActionButton({
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildTileButton({required String label, required VoidCallback onTap}) {
     return Container(
       height: 60,
       decoration: BoxDecoration(
@@ -353,14 +396,95 @@ class _HomepageState extends State<Homepage> {
           child: Center(
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Colors.black87,
-                letterSpacing: 0.5,
-              ),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black87, letterSpacing: 0.5),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class SystemActionGridTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String btnLabel;
+  final Color surfaceColor;
+  final VoidCallback onTap;
+
+  const SystemActionGridTile({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.btnLabel,
+    required this.surfaceColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Colors.blueGrey.shade600, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 28.0),
+              child: Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+              ),
+            ),
+            const Spacer(),
+            Container(
+              height: 60,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300, width: 1),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Center(
+                    child: Text(
+                      btnLabel,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.black87, letterSpacing: 0.5),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          ],
         ),
       ),
     );
