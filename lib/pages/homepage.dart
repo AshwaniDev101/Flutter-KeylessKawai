@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
 import 'websocket_manager.dart';
 
+class AppStrings {
+  // Commands
+  static const String cmdLockTrigger = 'LOCK_TRIGGER';
+  static const String cmdLedOn = 'LED_ON';
+  static const String cmdLedOff = 'LED_OFF';
+  static const String cmdIndoorOn = 'INDOOR_LIGHT_ON';
+  static const String cmdIndoorOff = 'INDOOR_LIGHT_OFF';
+  static const String cmdOutdoorOn = 'OUTDOOR_LIGHT_ON';
+  static const String cmdOutdoorOff = 'OUTDOOR_LIGHT_OFF';
+  static const String cmdBuzzerOn = 'BUZZER_ON';
+  static const String cmdBuzzerOff = 'BUZZER_OFF';
+}
+
 class Homepage extends StatefulWidget {
   const Homepage({super.key});
 
@@ -15,20 +28,48 @@ class _HomepageState extends State<Homepage> {
   bool _outdoorOn = false;
   bool _buzzerOn = false;
 
-  // Optimistic UI state updates & WS execution
+  // Snap/Autoscroll flag for terminal tracking
+  bool _snapToLatest = true;
+
+  final TextEditingController _consoleController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  // Optimistic UI state updates, WS execution & terminal logging
   void _executeSecureCommand(String command) {
     WebSocketManager.sendOnce(command);
 
     setState(() {
-      if (command == "LED_ON") _ledOn = true;
-      if (command == "LED_OFF") _ledOn = false;
-      if (command == "INDOOR_LIGHT_ON") _indoorOn = true;
-      if (command == "INDOOR_LIGHT_OFF") _indoorOn = false;
-      if (command == "OUTDOOR_LIGHT_ON") _outdoorOn = true;
-      if (command == "OUTDOOR_LIGHT_OFF") _outdoorOn = false;
-      if (command == "BUZZER_ON") _buzzerOn = true;
-      if (command == "BUZZER_OFF") _buzzerOn = false;
+      _consoleController.text += "[TX] -> $command\n";
+
+      if (command == AppStrings.cmdLedOn) _ledOn = true;
+      if (command == AppStrings.cmdLedOff) _ledOn = false;
+      if (command == AppStrings.cmdIndoorOn) _indoorOn = true;
+      if (command == AppStrings.cmdIndoorOff) _indoorOn = false;
+      if (command == AppStrings.cmdOutdoorOn) _outdoorOn = true;
+      if (command == AppStrings.cmdOutdoorOff) _outdoorOn = false;
+      if (command == AppStrings.cmdBuzzerOn) _buzzerOn = true;
+      if (command == AppStrings.cmdBuzzerOff) _buzzerOn = false;
     });
+
+    // Handle automated scroll execution if flag is active
+    if (_snapToLatest) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _consoleController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -61,46 +102,82 @@ class _HomepageState extends State<Homepage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero Banner: Main Lock
-              Container(
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.grey.shade200, width: 1),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _executeSecureCommand("LOCK_TRIGGER"),
-                      splashColor: primaryAccent.withValues(alpha: 0.1),
-                      highlightColor: Colors.transparent,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 36.0, horizontal: 16.0),
-                        child: Column(
-                          mainAxisAlignment:  MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundColor: primaryAccent.withValues(alpha: 0.08),
-                              child: Icon(Icons.lock_open_rounded, size: 36, color: primaryAccent),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              "Main Entrance Lock",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black87),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "Tap to unlock for 1 second",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 13, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
-                            ),
-                          ],
+              // Terminal window container stack with nested snap controller
+              Stack(
+                children: [
+                  TextField(
+                    controller: _consoleController,
+                    scrollController: _scrollController,
+                    maxLines: 14, // Increased maxLines for a taller console window
+                    readOnly: true,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 8,
+                      color: Colors.lightGreenAccent,
+                    ),
+                    decoration: InputDecoration(
+                      fillColor: Colors.black87,
+                      filled: true,
+                      hintText: "Terminal ready...",
+                      hintStyle: const TextStyle(color: Colors.grey, fontFamily: 'monospace', fontSize: 12),
+                      contentPadding: const EdgeInsets.all(16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: FloatingActionButton(
+                        onPressed: () {
+                          setState(() {
+                            _snapToLatest = !_snapToLatest;
+                          });
+                        },
+                        elevation: 2,
+                        backgroundColor: _snapToLatest ? Colors.lightGreenAccent : Colors.grey.shade800,
+                        mini: true,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        child: Icon(
+                          Icons.vertical_align_bottom_rounded,
+                          size: 16,
+                          color: _snapToLatest ? Colors.black87 : Colors.white70,
                         ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Normalized and downsized central interactive asset
+              Center(
+                child: SizedBox(
+                  width: 160,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _executeSecureCommand(AppStrings.cmdLockTrigger),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: surfaceColor,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200, width: 1),
+                      ),
+                    ),
+                    icon: Icon(Icons.lock_open_rounded, color: primaryAccent, size: 20),
+                    label: const Text(
+                      "Unlock",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
@@ -128,38 +205,38 @@ class _HomepageState extends State<Homepage> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 1.1, // Aspect ratio optimized for a compact layout
+                childAspectRatio: 1.1,
                 children: [
                   _buildMinimalGridTile(
                     title: "Built-in LED",
                     subtitle: "NodeMCU D4",
                     icon: Icons.developer_board_rounded,
-                    onCmd: "LED_ON",
-                    offCmd: "LED_OFF",
+                    onCmd: AppStrings.cmdLedOn,
+                    offCmd: AppStrings.cmdLedOff,
                     surfaceColor: surfaceColor,
                   ),
                   _buildMinimalGridTile(
                     title: "Indoor Light",
                     subtitle: "Living Room D1",
                     icon: Icons.light_rounded,
-                    onCmd: "INDOOR_LIGHT_ON",
-                    offCmd: "INDOOR_LIGHT_OFF",
+                    onCmd: AppStrings.cmdIndoorOn,
+                    offCmd: AppStrings.cmdIndoorOff,
                     surfaceColor: surfaceColor,
                   ),
                   _buildMinimalGridTile(
                     title: "Outdoor Light",
                     subtitle: "Backyard D2",
                     icon: Icons.wb_sunny_rounded,
-                    onCmd: "OUTDOOR_LIGHT_ON",
-                    offCmd: "OUTDOOR_LIGHT_OFF",
+                    onCmd: AppStrings.cmdOutdoorOn,
+                    offCmd: AppStrings.cmdOutdoorOff,
                     surfaceColor: surfaceColor,
                   ),
                   _buildMinimalGridTile(
                     title: "System Buzzer",
                     subtitle: "Alarm Output D7",
                     icon: Icons.volume_up_rounded,
-                    onCmd: "BUZZER_ON",
-                    offCmd: "BUZZER_OFF",
+                    onCmd: AppStrings.cmdBuzzerOn,
+                    offCmd: AppStrings.cmdBuzzerOff,
                     surfaceColor: surfaceColor,
                   ),
                 ],
@@ -189,9 +266,8 @@ class _HomepageState extends State<Homepage> {
         padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // Forces column to stay compact
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon and Header Layout
             Row(
               children: [
                 Icon(
@@ -212,7 +288,6 @@ class _HomepageState extends State<Homepage> {
             ),
             const SizedBox(height: 2),
 
-            // Nested Subtitle
             Padding(
               padding: const EdgeInsets.only(left: 28.0),
               child: Text(
@@ -221,9 +296,8 @@ class _HomepageState extends State<Homepage> {
               ),
             ),
 
-            const SizedBox(height: 14), // Controlled fixed gap between info and controls
+            const SizedBox(height: 14),
 
-            // Identical Action Buttons
             Row(
               children: [
                 Expanded(
@@ -252,7 +326,7 @@ class _HomepageState extends State<Homepage> {
     required VoidCallback onTap,
   }) {
     return Container(
-      height: 40,
+      height: 60,
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(12),
