@@ -15,9 +15,9 @@ void main() async {
     await windowManager.ensureInitialized();
 
     WindowOptions windowOptions = const WindowOptions(
-      size: Size(850, 550),         // Set your exact starting size
-      minimumSize: Size(850, 550),  // Prevent shrinking
-      maximumSize: Size(850, 550),  // Prevent growing
+      size: Size(600, 600),         // Set your exact starting size
+      minimumSize: Size(600, 600),  // Prevent shrinking
+      maximumSize: Size(600, 600),   // Prevent growing
       center: true,                 // Boot up in the middle of the screen
       title: "Keyless Kawaii",
     );
